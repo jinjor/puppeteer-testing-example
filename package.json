@@ -1,0 +1,16 @@
+{
+  "name": "puppeteer-testing-example",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "express": "^4.16.3",
+    "fs-extra": "^6.0.1",
+    "mocha": "^5.2.0",
+    "puppeteer": "^1.5.0"
+  },
+  "scripts": {
+    "start": "node test/dev.js",
+    "test": "mocha test/test.js"
+  }
+}
