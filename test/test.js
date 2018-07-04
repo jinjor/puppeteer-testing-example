@@ -1,9 +1,9 @@
-const assert = require("assert");
 const puppeteer = require("puppeteer");
 const Server = require("./server");
 const Accesses = require("./accesses");
 const Responses = require("./responses");
 const Screenshot = require("./screenshot");
+const EditPage = require("./pages/edit");
 
 const port = 3000;
 const screenshotDir = "./screenshot";
@@ -14,6 +14,15 @@ const responses = new Responses(topPage);
 const screenshot = new Screenshot(screenshotDir);
 const server = new Server();
 server.static(publicDir);
+
+const pageClasses = [EditPage];
+const common404 = {
+  status: 404,
+  contentType: "text/plain",
+  body: JSON.stringify({
+    message: "Sorry, not found!"
+  })
+};
 
 describe("Pages", function() {
   let browser;
@@ -42,49 +51,33 @@ describe("Pages", function() {
   beforeEach(async function() {
     accesses.reset();
     responses.reset();
-    responses.set404({
-      status: 404,
-      contentType: "text/plain",
-      body: JSON.stringify({
-        message: "Sorry, not found!"
-      })
-    });
+    responses.set404(common404);
   });
-  describe("Edit page", function() {
-    before(async function() {
-      await page.goto(topPage);
-      await screenshot.page(page, "edit");
-    });
-    beforeEach(async function() {
-      responses.add("GET", "/config", {
-        status: 200,
-        contentType: "text/plain",
-        body: JSON.stringify({
-          defaultText: "abc"
-        })
+  for (let pageClass of pageClasses) {
+    const pageName = pageClass.name;
+    describe(pageName, function() {
+      let thisPage;
+      before(async function() {
+        thisPage = new pageClass(page);
+        await page.goto(`${topPage}/${thisPage.url}`);
+        await screenshot.page(page, pageName);
       });
-      await page.goto(topPage);
+      beforeEach(async function() {
+        for (let key in thisPage.requirements) {
+          const response = thisPage.requirements[key];
+          responses.add("GET", key, response);
+        }
+        await page.goto(`${topPage}/${thisPage.url}`);
+      });
+      for (let method of Object.getOwnPropertyNames(pageClass.prototype)) {
+        if (method.startsWith("should")) {
+          it(method, async () => {
+            await thisPage[method](accesses, screenshot);
+          });
+        }
+      }
     });
-    it("should send data", async () => {
-      await page.click("#submit");
-      assert.equal(accesses.get("POST", "/articles").body.text, "abc");
-      await page.waitFor(50);
-      await screenshot.debug(page, "after-submit");
-    });
-    it("should send input data", async () => {
-      await page.click("#clear");
-      await page.type("#text", "def");
-      assert.equal(accesses.get("POST", "/articles"), undefined);
-      await page.click("#submit");
-      assert.equal(accesses.get("POST", "/articles").body.text, "def");
-    });
-    // this will fail because validation is not implemented yet.
-    it("should not send invalid data", async () => {
-      await page.click("#clear");
-      await page.click("#submit");
-      assert.equal(accesses.get("POST", "/articles"), undefined);
-    });
-  });
+  }
   afterEach(async function() {
     if (this.currentTest.state === "failed") {
       const name = this.currentTest.title.replace(/[^0-9a-zA-Z]/g, "_");
