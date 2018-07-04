@@ -1,17 +1,22 @@
 const express = require("express");
 
-let server;
-module.exports.start = function(dir, port) {
-  return new Promise((resolve, reject) => {
-    const app = express();
-    app.use(express.static(dir));
-    server = app.listen(port, () => {
-      resolve();
+module.exports = class Server {
+  constructor() {
+    this.app = express();
+  }
+  static(publicDir) {
+    this.app.use(express.static(publicDir));
+  }
+  start(port) {
+    return new Promise((resolve, reject) => {
+      this.server = this.app.listen(port, () => {
+        resolve();
+      });
     });
-  });
-};
-module.exports.close = function() {
-  if (server) {
-    server.close();
+  }
+  close() {
+    if (this.server !== undefined) {
+      this.server.close();
+    }
   }
 };
